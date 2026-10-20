@@ -1,44 +1,85 @@
 diff --git a/libcontainer/seccomp/seccomp_unsupported.go b/libcontainer/seccomp/seccomp_unsupported.go
-index 25713f2..6369c94 100644
+index 25713f2..d6efee9 100644
 --- a/libcontainer/seccomp/seccomp_unsupported.go
 +++ b/libcontainer/seccomp/seccomp_unsupported.go
-@@ -4,6 +4,8 @@ package seccomp
- 
- import (
- 	"errors"
-+	"fmt"
-+	"os"
- 
- 	"github.com/opencontainers/runc/libcontainer/configs"
- 	"github.com/opencontainers/runtime-spec/specs-go"
-@@ -11,9 +13,15 @@ import (
- 
- var ErrSeccompNotEnabled = errors.New("seccomp: config provided but seccomp not supported")
- 
-+const outpostNoSeccompOptIn = "OUTPOST_DKS_ALLOW_NO_SECCOMP"
-+
+@@ -14,7 +14,7 @@ var ErrSeccompNotEnabled = errors.New("seccomp: config provided but seccomp not
  // InitSeccomp does nothing because seccomp is not supported.
  func InitSeccomp(config *configs.Seccomp) (int, error) {
  	if config != nil {
-+		if os.Getenv(outpostNoSeccompOptIn) == "1" {
-+			fmt.Fprintln(os.Stderr, "WARNING: Outpost DKS is ignoring OCI seccomp rules; this runtime does not enforce seccomp")
-+			return -1, nil
-+		}
- 		return -1, ErrSeccompNotEnabled
+-		return -1, ErrSeccompNotEnabled
++		return initUnsupportedSeccomp(config)
  	}
  	return -1, nil
-diff --git a/libcontainer/seccomp/seccomp_unsupported_outpost_test.go b/libcontainer/seccomp/seccomp_unsupported_outpost_test.go
+ }
+diff --git a/libcontainer/seccomp/seccomp_unsupported_default.go b/libcontainer/seccomp/seccomp_unsupported_default.go
 new file mode 100644
-index 0000000..17adba8
+index 0000000..0ce5e58
 --- /dev/null
-+++ b/libcontainer/seccomp/seccomp_unsupported_outpost_test.go
-@@ -0,0 +1,40 @@
-+//go:build !linux || !cgo || !seccomp
++++ b/libcontainer/seccomp/seccomp_unsupported_default.go
+@@ -0,0 +1,9 @@
++//go:build (!linux || !cgo || !seccomp) && !dks_noseccomp
++
++package seccomp
++
++import "github.com/opencontainers/runc/libcontainer/configs"
++
++func initUnsupportedSeccomp(_ *configs.Seccomp) (int, error) {
++	return -1, ErrSeccompNotEnabled
++}
+diff --git a/libcontainer/seccomp/seccomp_unsupported_default_test.go b/libcontainer/seccomp/seccomp_unsupported_default_test.go
+new file mode 100644
+index 0000000..73bea88
+--- /dev/null
++++ b/libcontainer/seccomp/seccomp_unsupported_default_test.go
+@@ -0,0 +1,16 @@
++//go:build (!linux || !cgo || !seccomp) && !dks_noseccomp
 +
 +package seccomp
 +
 +import (
 +	"errors"
++	"testing"
++
++	"github.com/opencontainers/runc/libcontainer/configs"
++)
++
++func TestDefaultNoSeccompFailsClosed(t *testing.T) {
++	if _, err := InitSeccomp(&configs.Seccomp{}); !errors.Is(err, ErrSeccompNotEnabled) {
++		t.Fatalf("default no-seccomp build must fail closed: %v", err)
++	}
++}
+diff --git a/libcontainer/seccomp/seccomp_unsupported_dks.go b/libcontainer/seccomp/seccomp_unsupported_dks.go
+new file mode 100644
+index 0000000..4d1ca9a
+--- /dev/null
++++ b/libcontainer/seccomp/seccomp_unsupported_dks.go
+@@ -0,0 +1,15 @@
++//go:build (!linux || !cgo || !seccomp) && dks_noseccomp
++
++package seccomp
++
++import (
++	"fmt"
++	"os"
++
++	"github.com/opencontainers/runc/libcontainer/configs"
++)
++
++func initUnsupportedSeccomp(_ *configs.Seccomp) (int, error) {
++	fmt.Fprintln(os.Stderr, "WARNING: Outpost DKS is ignoring OCI seccomp rules; this runtime does not enforce seccomp")
++	return -1, nil
++}
+diff --git a/libcontainer/seccomp/seccomp_unsupported_dks_test.go b/libcontainer/seccomp/seccomp_unsupported_dks_test.go
+new file mode 100644
+index 0000000..45f0a04
+--- /dev/null
++++ b/libcontainer/seccomp/seccomp_unsupported_dks_test.go
+@@ -0,0 +1,29 @@
++//go:build (!linux || !cgo || !seccomp) && dks_noseccomp
++
++package seccomp
++
++import (
 +	"os"
 +	"strings"
 +	"testing"
@@ -46,30 +87,20 @@ index 0000000..17adba8
 +	"github.com/opencontainers/runc/libcontainer/configs"
 +)
 +
-+func TestOutpostNoSeccompRequiresExplicitOptIn(t *testing.T) {
-+	config := &configs.Seccomp{}
-+	t.Setenv(outpostNoSeccompOptIn, "")
-+	if _, err := InitSeccomp(config); !errors.Is(err, ErrSeccompNotEnabled) {
-+		t.Fatalf("default must fail closed: %v", err)
-+	}
-+	t.Setenv(outpostNoSeccompOptIn, "true")
-+	if _, err := InitSeccomp(config); !errors.Is(err, ErrSeccompNotEnabled) {
-+		t.Fatalf("non-exact opt-in must fail closed: %v", err)
-+	}
-+	t.Setenv(outpostNoSeccompOptIn, "1")
++func TestDKSNoSeccompVariantWarns(t *testing.T) {
 +	read, write, err := os.Pipe()
 +	if err != nil {
 +		t.Fatal(err)
 +	}
 +	saved := os.Stderr
 +	os.Stderr = write
-+	_, gotErr := InitSeccomp(config)
++	fd, gotErr := InitSeccomp(&configs.Seccomp{})
 +	write.Close()
 +	os.Stderr = saved
-+	message := make([]byte, 256)
-+	n, _ := read.Read(message)
++	buf := make([]byte, 256)
++	n, _ := read.Read(buf)
 +	read.Close()
-+	if gotErr != nil || !strings.Contains(string(message[:n]), "WARNING: Outpost DKS is ignoring OCI seccomp rules") {
-+		t.Fatalf("opt-in must warn and continue: err=%v warning=%q", gotErr, message[:n])
++	if fd != -1 || gotErr != nil || !strings.Contains(string(buf[:n]), "WARNING: Outpost DKS is ignoring OCI seccomp rules") {
++		t.Fatalf("DKS variant fd=%d err=%v warning=%q", fd, gotErr, buf[:n])
 +	}
 +}

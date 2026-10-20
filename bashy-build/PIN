@@ -8,7 +8,8 @@
 # The OCI runtime the outpost runtime image's containerd shim execs. The one
 # cgo build in the image: runc's nsenter (and its userns helper) are C, linked
 # statically against musl. Built WITHOUT the seccomp tag: libseccomp is LGPL,
-# so neither it nor libseccomp-golang is linked.
+# so neither it nor libseccomp-golang is linked. The signed DKS variant uses
+# dks_noseccomp; the untagged default remains fail-closed.
 # Upstream LICENSE at this tag: Apache-2.0.
 TOOL=runc
 FORK_REPO=qiangli/runc
@@ -37,8 +38,8 @@ GO_LDFLAGS="-X main.gitCommit=$UPSTREAM_COMMIT"
 # Upstream `make static` tags (BUILDTAGS + netgo osusergo) minus seccomp and
 # libpathrs (a Rust C library; without the tag runc uses its pure-Go
 # pathrs-lite).
-GO_BUILD_TAGS="urfave_cli_no_docs,netgo,osusergo"
-GO_AUDIT_TAGS="urfave_cli_no_docs,netgo,osusergo"
+GO_BUILD_TAGS="urfave_cli_no_docs,netgo,osusergo,dks_noseccomp"
+GO_AUDIT_TAGS="urfave_cli_no_docs,netgo,osusergo,dks_noseccomp"
 GO_BUILD_FLAGS=""
 # The kind's audit type-checks the cgo files (nsenter, userns) only with cgo on;
 # build.yml builds with exactly this environment.
@@ -53,7 +54,7 @@ GO_CGO="runc-linux-amd64=1 runc-linux-arm64=1"
 # link would not be a permissive artifact). linux-libc-dev: the kernel UAPI
 # headers nsenter includes.
 APT_PACKAGES="strace util-linux iproute2 musl-tools linux-libc-dev"
-SOURCE_PATCH_SHA256=096305b015f93e0fb2850fdabf78f99e121da54ba7a8097385a9e1757b22215b
+SOURCE_PATCH_SHA256=9bba2c4327333f224705d47d6066fc43a124221ffc9c3e3abe23758391d55272
 PRE_BUILD_GATES=""
 SHARED_FILES="egress-verdict.sh"
 # Argument of bashy-build/no-egress-test.sh (a GitHub expression is allowed).
@@ -63,5 +64,5 @@ EGRESS_TARGET='out/${{ matrix.asset }}'
 RELEASE_EXTRA="PIN=runc-pin.txt otel.env=runc-otel.env no-tracking.env=runc-no-tracking.env vuln-ignore=vuln-ignore"
 RELEASE_ASSETS="runc-linux-amd64 runc-linux-arm64 runc-$UPSTREAM_TAG.cdx.json runc-$UPSTREAM_TAG.govulncheck.json runc-pin.txt runc-otel.env runc-no-tracking.env vuln-ignore"
 RELEASE_EXECUTABLES="runc-linux-amd64 runc-linux-arm64"
-RELEASE_NOTE="Static runc, cgo linked against musl for nsenter only. Built without the seccomp tag, so libseccomp (LGPL) is not linked; a reviewed source patch keeps default fail-closed and allows Outpost DKS to ignore OCI seccomp rules only with OUTPOST_DKS_ALLOW_NO_SECCOMP=1 and a loud warning, and without the libpathrs tag (pure-Go pathrs-lite). It makes no network connection."
+RELEASE_NOTE="Static runc for Outpost DKS, cgo linked against musl for nsenter only. Built with dks_noseccomp and without the seccomp tag, so libseccomp (LGPL) is not linked; a reviewed source patch leaves default runc fail-closed while the DKS variant ignores OCI seccomp rules with a loud warning. Built without libpathrs (pure-Go pathrs-lite). It makes no network connection."
 RELEASE_GATES="pinned commit, pinned Go toolchain (EOL-minor security override: built with go1.26.9, not the tag's end-of-life go1.25.0), the tag's own vendor/ unmodified, static musl link (no ELF interpreter), no seccomp tag and no libseccomp-golang linked, govulncheck of the shipped package (reachable, unwaived = fail), CycloneDX SBOM, no-egress (including a container run)."
