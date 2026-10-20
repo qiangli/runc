@@ -53,6 +53,7 @@ GO_CGO="runc-linux-amd64=1 runc-linux-arm64=1"
 # link would not be a permissive artifact). linux-libc-dev: the kernel UAPI
 # headers nsenter includes.
 APT_PACKAGES="strace util-linux iproute2 musl-tools linux-libc-dev"
+SOURCE_PATCH_SHA256=096305b015f93e0fb2850fdabf78f99e121da54ba7a8097385a9e1757b22215b
 PRE_BUILD_GATES=""
 SHARED_FILES="egress-verdict.sh"
 # Argument of bashy-build/no-egress-test.sh (a GitHub expression is allowed).
@@ -62,5 +63,5 @@ EGRESS_TARGET='out/${{ matrix.asset }}'
 RELEASE_EXTRA="PIN=runc-pin.txt otel.env=runc-otel.env no-tracking.env=runc-no-tracking.env vuln-ignore=vuln-ignore"
 RELEASE_ASSETS="runc-linux-amd64 runc-linux-arm64 runc-$UPSTREAM_TAG.cdx.json runc-$UPSTREAM_TAG.govulncheck.json runc-pin.txt runc-otel.env runc-no-tracking.env vuln-ignore"
 RELEASE_EXECUTABLES="runc-linux-amd64 runc-linux-arm64"
-RELEASE_NOTE="Static runc, cgo linked against musl for nsenter only. Built without the seccomp tag, so libseccomp (LGPL) is not linked and seccomp profiles are not enforced by this runc, and without the libpathrs tag (pure-Go pathrs-lite). It makes no network connection."
+RELEASE_NOTE="Static runc, cgo linked against musl for nsenter only. Built without the seccomp tag, so libseccomp (LGPL) is not linked; a reviewed source patch keeps default fail-closed and allows Outpost DKS to ignore OCI seccomp rules only with OUTPOST_DKS_ALLOW_NO_SECCOMP=1 and a loud warning, and without the libpathrs tag (pure-Go pathrs-lite). It makes no network connection."
 RELEASE_GATES="pinned commit, pinned Go toolchain (EOL-minor security override: built with go1.26.9, not the tag's end-of-life go1.25.0), the tag's own vendor/ unmodified, static musl link (no ELF interpreter), no seccomp tag and no libseccomp-golang linked, govulncheck of the shipped package (reachable, unwaived = fail), CycloneDX SBOM, no-egress (including a container run)."

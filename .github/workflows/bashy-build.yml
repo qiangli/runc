@@ -122,6 +122,13 @@ jobs:
           path: src
       - name: verify HEAD == pinned commit
         run: fork/bashy-build/verify-pin.sh src "$GITHUB_REF_NAME"
+      - name: apply reviewed Outpost no-seccomp opt-in
+        run: |
+          set -euo pipefail
+          . fork/bashy-build/PIN
+          printf '%s  %s\n' "$SOURCE_PATCH_SHA256" fork/bashy-build/no-seccomp-opt-in.patch | sha256sum -c -
+          git -C src apply --check ../fork/bashy-build/no-seccomp-opt-in.patch
+          git -C src apply ../fork/bashy-build/no-seccomp-opt-in.patch
       - name: host build dependencies (linux)
         if: runner.os == 'Linux'
         run: |
@@ -581,6 +588,13 @@ jobs:
           path: src
       - name: verify HEAD == pinned commit
         run: fork/bashy-build/verify-pin.sh src "$GITHUB_REF_NAME"
+      - name: apply reviewed Outpost no-seccomp opt-in
+        run: |
+          set -euo pipefail
+          . fork/bashy-build/PIN
+          printf '%s  %s\n' "$SOURCE_PATCH_SHA256" fork/bashy-build/no-seccomp-opt-in.patch | sha256sum -c -
+          git -C src apply --check ../fork/bashy-build/no-seccomp-opt-in.patch
+          git -C src apply ../fork/bashy-build/no-seccomp-opt-in.patch
       # The audit job judges the SAME tree the build job compiles, so it
       # reuses the build job's setup verbatim rather than keeping a second
       # copy: the pinned toolchain, the recorded toolchain override and the
