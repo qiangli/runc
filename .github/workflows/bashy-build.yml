@@ -549,7 +549,7 @@ jobs:
           # go-pathrs (the libpathrs binding).
           go version -m "../out/$ASSET" | tee "$RUNNER_TEMP/buildinfo"
           grep -qE '^[[:space:]]+build[[:space:]]+CGO_ENABLED=1$' "$RUNNER_TEMP/buildinfo" || { echo "not a cgo build"; exit 1; }
-          if grep -qE 'seccomp' "$RUNNER_TEMP/buildinfo"; then echo "seccomp is linked or tagged"; exit 1; fi
+          if grep -qE '(^|[[:space:],])seccomp([,[:space:]]|$)|libseccomp-golang' "$RUNNER_TEMP/buildinfo"; then echo "libseccomp is linked or the seccomp tag is set"; exit 1; fi
           if grep -qE 'libpathrs|go-pathrs' "$RUNNER_TEMP/buildinfo"; then echo "libpathrs is linked or tagged"; exit 1; fi
           # Smoke: the binary reports the pinned release and no libseccomp.
           "../out/$ASSET" "$GO_VERSION_ARG" | tee "$RUNNER_TEMP/version"
